@@ -20,6 +20,9 @@ zlib = require 'zlib'
 # require('request-debug')(rp)
 StatsD = require 'node-statsd'
 succes = false
+memoryRatePerDay = 1440
+memoryRatePerSecond = (memoryRatePerDay / 24 / 60 / 60)
+memoryPollInterval = 1000 / memoryRatePerSecond
 class ScreepsStatsd
 
   ###
@@ -33,7 +36,7 @@ class ScreepsStatsd
     rp.defaults jar: true
     @loop()
 
-    setInterval @loop, 15000
+    setInterval @loop, memoryPollInterval
 
   loop: () =>
     @main()
