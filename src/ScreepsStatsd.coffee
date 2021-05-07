@@ -19,7 +19,6 @@ rp = require 'request-promise'
 zlib = require 'zlib'
 # require('request-debug')(rp)
 StatsD = require 'node-statsd'
-token = ""
 succes = false
 class ScreepsStatsd
 
@@ -37,24 +36,17 @@ class ScreepsStatsd
     setInterval @loop, 15000
 
   loop: () =>
-    @signin()
+    @main()
 
-  signin: () =>
-    if(token != "" && succes)
+  main:() =>
+    if (succes)
       @getMemory()
       return
+
+    console.log "Setting up client with host: " + process.env.GRAPHITE_PORT_8125_UDP_ADDR
+
     @client = new StatsD host: process.env.GRAPHITE_PORT_8125_UDP_ADDR
-    console.log "New login request - " + new Date()
-    options =
-      uri: 'https://screeps.com/api/auth/signin'
-      json: true
-      method: 'POST'
-      body:
-        email: process.env.SCREEPS_EMAIL
-        password: process.env.SCREEPS_PASSWORD
-    rp(options).then (x) =>
-      token = x.token
-      @getMemory()
+    @getMemory()
 
   getMemory: () =>
     succes = false
@@ -63,15 +55,11 @@ class ScreepsStatsd
       method: 'GET' 
       json: true
       resolveWithFullResponse: true
-      headers:
-        "X-Token": token
-        "X-Username": token
       qs:
         path: 'stats'
         shard: process.env.SCREEPS_SHARD
+        _token: process.env.SCREEPS_TOKEN 
     rp(options).then (x) =>
-      # yeah... dunno why
-      token = x.headers['x-token']
       return unless x.body.data
       data = x.body.data.split('gz:')[1]
       finalData = JSON.parse zlib.gunzipSync(new Buffer(data, 'base64')).toString()
@@ -80,7 +68,7 @@ class ScreepsStatsd
 
   report: (data, prefix="") =>
     if prefix is ''
-      console.log "Pushing to gauges - " + new Date()
+      console.log "Pushing to gauges - " + new Date().toString() + JSON.stringify(data)
     for k,v of data
       if typeof v is 'object'
         @report(v, prefix+k+'.')
